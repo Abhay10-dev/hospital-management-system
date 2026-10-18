@@ -1,0 +1,137 @@
+// ─── Prisma Schema with PasswordResetToken added ─────────────────────────────
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  passwordHash        String
+  fullName            String
+  roleId              Int
+  role                Role                 @relation(fields: [roleId], references: [id])
+  isActive            Boolean              @default(true)
+  deletedAt           DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  auditLogs           AuditLog[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique // SUPER_ADMIN | ADMIN | RECEPTIONIST | DOCTOR | NURSE | AI_SERVICE
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id     Int              @id @default(autoincrement())
+  action String           @unique // e.g. "availability:read", "booking:create", "patient:read"
+  roles  RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Patient {
+  id           String        @id @default(uuid())
+  mrn          String        @unique // Medical Record Number
+  firstName    String
+  lastName     String
+  dateOfBirth  DateTime
+  gender       String
+  phone        String
+  email        String?
+  address      String?
+  status       String        @default("ACTIVE") // ACTIVE | INACTIVE
+  deletedAt    DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  appointments Appointment[]
+
+  @@map("patients")
+}
+
+model Appointment {
+  id             String    @id @default(uuid())
+  patientId      String
+  patient        Patient   @relation(fields: [patientId], references: [id])
+  doctorId       String
+  department     String
+  scheduledStart DateTime
+  scheduledEnd   DateTime
+  status         String    @default("SCHEDULED") // SCHEDULED | CONFIRMED | CANCELLED | COMPLETED
+  notes          String?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("appointments")
+}
+
+model AuditLog {
+  id            BigInt   @id @default(autoincrement())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action        String   // LOGIN_SUCCESS | PATIENT_UPDATE | PATIENT_VIEW | BOOKING_REQUEST_CREATED ...
+  auditableType String   // Patient | Appointment | User | System
+  auditableId   String
+  oldValues     Json?
+  newValues     Json?
+  ipAddress     String?
+  userAgent     String?
+  performedAt   DateTime @default(now())
+
+  @@index([performedAt])
+  @@index([userId])
+  @@index([action])
+  @@map("audit_logs")
+}
