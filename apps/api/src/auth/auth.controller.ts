@@ -8,6 +8,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Inject,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
@@ -28,8 +29,8 @@ const COOKIE_OPTS = {
 @Controller('auth')
 export class AuthController {
   constructor(
-    private readonly authService: AuthService,
-    private readonly emailService: EmailService,
+    @Inject(AuthService) private readonly authService: AuthService,
+    @Inject(EmailService) private readonly emailService: EmailService,
   ) {}
 
   // ─── POST /auth/login ─────────────────────────────────────────────────────

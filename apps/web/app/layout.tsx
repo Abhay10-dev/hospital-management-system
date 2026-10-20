@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { RoleProvider } from '@/context/RoleContext';
 
@@ -9,16 +9,10 @@ const inter = Inter({
   display: 'swap',
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-mono',
-  display: 'swap',
-});
-
 export const metadata: Metadata = {
-  title: 'Hospital Management System (HMS) Demo',
+  title: 'Advfiction HMS',
   description:
-    'Clinical portal with Role-Based Access Control (RBAC), Audit Trail Viewer, and AI Voice Receptionist Integration',
+    'Advfiction Hospital Management System — Role-Based Clinical Portal with AI Voice Receptionist',
 };
 
 export default function RootLayout({
@@ -27,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body className="min-h-screen bg-background font-sans antialiased text-foreground">
+    <html lang="en" className={inter.variable}>
+      <body className="min-h-screen bg-[#F9FAFB] font-sans antialiased text-[#1F2937]">
         <RoleProvider>{children}</RoleProvider>
       </body>
     </html>

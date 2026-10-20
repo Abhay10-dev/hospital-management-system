@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async findById(id: string) {
     return this.prisma.user.findFirst({
@@ -29,7 +29,7 @@ export class UsersService {
 
   async findByEmailWithHash(email: string) {
     return this.prisma.user.findFirst({
-      where: { email, deletedAt: null, isActive: true },
+      where: { email, deletedAt: null },
       include: {
         role: {
           include: { permissions: { include: { permission: true } } },

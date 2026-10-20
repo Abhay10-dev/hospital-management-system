@@ -4,7 +4,6 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRole } from '@/context/RoleContext';
-import { Badge } from '@/components/ui/badge';
 import {
   LayoutDashboard,
   Users,
@@ -12,126 +11,127 @@ import {
   Stethoscope,
   ShieldAlert,
   Settings,
-  Lock,
+  HelpCircle,
+  Activity,
 } from 'lucide-react';
+
+interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: string[]; // which roles can see this item
+}
+
+const ALL_NAV_ITEMS: NavItem[] = [
+  {
+    title: 'Dashboard',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+    roles: ['SUPER_ADMIN', 'ADMIN', 'RECEPTIONIST', 'DOCTOR', 'NURSE'],
+  },
+  {
+    title: 'Patients',
+    href: '/patients',
+    icon: Users,
+    roles: ['SUPER_ADMIN', 'ADMIN', 'RECEPTIONIST', 'DOCTOR', 'NURSE'],
+  },
+  {
+    title: 'Appointments',
+    href: '/appointments',
+    icon: CalendarCheck,
+    roles: ['SUPER_ADMIN', 'ADMIN', 'RECEPTIONIST', 'DOCTOR', 'NURSE'],
+  },
+  {
+    title: 'Doctors & Schedules',
+    href: '/doctors',
+    icon: Stethoscope,
+    roles: ['SUPER_ADMIN', 'ADMIN', 'DOCTOR'],
+  },
+  {
+    title: 'Audit Logs',
+    href: '/audit-logs',
+    icon: ShieldAlert,
+    roles: ['SUPER_ADMIN'], // ONLY Super Admin sees this
+  },
+  {
+    title: 'Settings',
+    href: '/settings',
+    icon: Settings,
+    roles: ['SUPER_ADMIN', 'ADMIN'],
+  },
+];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { currentRole, canAccessAuditLogs, canManageUsers } = useRole();
+  const { currentRole } = useRole();
 
-  const navItems = [
-    {
-      title: 'Dashboard',
-      href: '/dashboard',
-      icon: LayoutDashboard,
-      accessible: true,
-    },
-    {
-      title: 'Patients',
-      href: '/patients',
-      icon: Users,
-      accessible: true,
-      badge: currentRole === 'NURSE' || currentRole === 'DOCTOR' ? 'Read-Only' : undefined,
-    },
-    {
-      title: 'Appointments',
-      href: '/appointments',
-      icon: CalendarCheck,
-      accessible: true,
-    },
-    {
-      title: 'Doctors & Staff',
-      href: '/doctors',
-      icon: Stethoscope,
-      accessible: true,
-    },
-    {
-      title: 'Audit Logs',
-      href: '/audit-logs',
-      icon: ShieldAlert,
-      accessible: true, // we render it even if disabled to show 403 guard when clicked!
-      restricted: !canAccessAuditLogs,
-      badge: canAccessAuditLogs ? 'Super Admin' : 'Locked',
-    },
-    {
-      title: 'Settings & RBAC',
-      href: '/settings',
-      icon: Settings,
-      accessible: true,
-      restricted: !canManageUsers,
-    },
-  ];
+  // Filter nav items to only those accessible by current role
+  const visibleItems = ALL_NAV_ITEMS.filter((item) =>
+    item.roles.includes(currentRole)
+  );
 
   return (
-    <aside className="w-64 border-r border-border bg-white flex flex-col justify-between shrink-0 min-h-[calc(100vh-4rem)]">
-      <div className="p-4 space-y-6">
-        <div>
-          <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            Clinical Operations
-          </p>
-          <nav className="space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary text-white font-semibold'
-                      : 'text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                    <span>{item.title}</span>
-                  </div>
-
-                  {item.restricted ? (
-                    <div className="flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                      <Lock className="h-3 w-3" />
-                      <span>403</span>
-                    </div>
-                  ) : item.badge ? (
-                    <Badge
-                      variant={
-                        item.badge === 'Super Admin'
-                          ? 'superadmin'
-                          : item.badge === 'Read-Only'
-                          ? 'secondary'
-                          : 'default'
-                      }
-                      className="text-[10px] px-1.5 py-0 font-normal"
-                    >
-                      {item.badge}
-                    </Badge>
-                  ) : null}
-                </Link>
-              );
-            })}
-          </nav>
+    // PDF Module 3: #0F172A sidebar, fixed full height, 256px wide
+    <aside
+      className="w-64 shrink-0 flex flex-col bg-[#0F172A] min-h-screen"
+      aria-label="Main navigation"
+    >
+      {/* Brand */}
+      <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
+        {/* Logo tile: 36×36px, rounded-xl, #2563EB background */}
+        <div className="h-9 w-9 rounded-xl bg-[#2563EB] flex items-center justify-center shrink-0">
+          <Activity className="h-5 w-5 text-white" aria-hidden="true" />
         </div>
-
-        {/* Demo Persona Card */}
-        <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
-          <p className="text-xs font-semibold text-slate-800">Demo Persona Active</p>
-          <p className="text-[11px] text-slate-600 leading-relaxed">
-            Switching roles in the top bar instantly updates CASL capabilities and access rights in real time.
-          </p>
-          <div className="pt-1">
-            <span className="inline-block text-[10px] font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-              HIPAA Compliant Demo
-            </span>
-          </div>
+        <div className="min-w-0">
+          {/* Brand title: text-sm font-bold white */}
+          <p className="text-sm font-bold text-white truncate leading-tight">Advfiction HMS</p>
+          {/* Subtitle: 10px text-white/50 */}
+          <p className="text-[10px] text-white/50 truncate leading-tight">Hospital Management System</p>
         </div>
       </div>
 
-      {/* Footer Info */}
-      <div className="p-4 border-t border-slate-200 text-[11px] text-muted-foreground flex flex-col gap-1">
-        <span>HealthPulse Engine v1.0</span>
-        <span className="text-slate-400">Deployed on Vercel</span>
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1" aria-label="Sidebar navigation">
+        {/* Module label: 10px uppercase tracking-widest text-white/40 */}
+        <p className="px-3 mb-2 text-[10px] font-medium uppercase tracking-widest text-white/40 select-none">
+          Clinical Operations
+        </p>
+
+        {visibleItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={isActive ? 'page' : undefined}
+              className={[
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150',
+                isActive
+                  ? 'bg-[#2563EB] text-white shadow-sm'
+                  : 'text-white/60 hover:bg-white/10 hover:text-white',
+              ].join(' ')}
+            >
+              <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+              <span className="truncate">{item.title}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Footer */}
+      <div className="px-3 py-4 border-t border-white/10 space-y-1">
+        <button
+          type="button"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-white/60 hover:bg-white/10 hover:text-white transition-colors duration-150"
+          aria-label="Help and support"
+        >
+          <HelpCircle className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+          <span>Help & Support</span>
+        </button>
+        {/* Version info */}
+        <p className="px-3 text-[10px] text-white/30 select-none mt-2">Advfiction HMS v1.0</p>
       </div>
     </aside>
   );

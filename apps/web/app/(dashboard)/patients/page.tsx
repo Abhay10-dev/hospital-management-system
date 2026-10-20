@@ -2,19 +2,18 @@
 
 import React, { useState } from 'react';
 import { useRole } from '@/context/RoleContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { PatientRecord } from '@hospital/shared-types';
 import {
-  Users,
   Plus,
   Search,
   Eye,
   Edit,
-  ShieldCheck,
-  AlertTriangle,
+  UserCheck,
 } from 'lucide-react';
 
 const MOCK_PATIENTS: PatientRecord[] = [
@@ -57,12 +56,51 @@ const MOCK_PATIENTS: PatientRecord[] = [
     createdAt: '2026-03-01T11:15:00Z',
     updatedAt: '2026-10-17T16:20:00Z',
   },
+  {
+    id: 'pat_1105',
+    mrn: 'MRN-2026-0115',
+    firstName: 'David',
+    lastName: 'Tennant',
+    dateOfBirth: '1971-04-18',
+    gender: 'Male',
+    phone: '+1-555-0191',
+    email: 'david.t@example.com',
+    status: 'ACTIVE',
+    createdAt: '2026-04-02T10:00:00Z',
+    updatedAt: '2026-10-16T11:10:00Z',
+  },
+  {
+    id: 'pat_1108',
+    mrn: 'MRN-2026-0118',
+    firstName: 'Rose',
+    lastName: 'Tyler',
+    dateOfBirth: '1987-07-24',
+    gender: 'Female',
+    phone: '+1-555-0163',
+    email: 'rose.t@example.com',
+    status: 'ACTIVE',
+    createdAt: '2026-04-12T14:20:00Z',
+    updatedAt: '2026-10-15T09:45:00Z',
+  },
+  {
+    id: 'pat_1120',
+    mrn: 'MRN-2026-0130',
+    firstName: 'Rory',
+    lastName: 'Williams',
+    dateOfBirth: '1988-12-05',
+    gender: 'Male',
+    phone: '+1-555-0177',
+    email: 'rory.w@example.com',
+    status: 'INACTIVE',
+    createdAt: '2026-05-18T16:00:00Z',
+    updatedAt: '2026-09-20T10:30:00Z',
+  },
 ];
 
 export default function PatientsPage() {
   const { currentRole, canEditPatients } = useRole();
   const [searchTerm, setSearchTerm] = useState('');
-  const [patients, setPatients] = useState<PatientRecord[]>(MOCK_PATIENTS);
+  const [patients] = useState<PatientRecord[]>(MOCK_PATIENTS);
 
   const filtered = patients.filter(
     (p) =>
@@ -73,103 +111,113 @@ export default function PatientsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header card with action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Patient Registry (PHI Records)</h1>
-          <p className="text-sm text-muted-foreground">
-            All view and edit events on this page automatically trigger PHI audit log entries
+          <h2 className="text-xl font-bold text-[#111827]">Patient Records</h2>
+          <p className="text-sm text-[#6B7280]">
+            Review patient directory and medical record numbers (fictional records).
           </p>
         </div>
 
         {canEditPatients ? (
-          <Button
-            size="sm"
-            onClick={() => alert('New patient registration modal (Phase 4)...')}
-            className="gap-1.5"
-          >
-            <Plus className="h-4 w-4" />
-            Register Patient
+          <Button size="sm" className="gap-1.5 self-start sm:self-auto">
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add Patient
           </Button>
         ) : (
           <Badge variant="secondary" className="py-1">
-            Read-Only Access ({currentRole})
+            Read-Only Access ({currentRole.replace('_', ' ')})
           </Badge>
         )}
       </div>
 
-      <Card className="p-4 bg-white border-border">
+      {/* Search Filter Card */}
+      <Card>
         <div className="relative max-w-sm">
-          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" aria-hidden="true" />
           <Input
-            placeholder="Search patient name or MRN..."
+            placeholder="Search by patient name or MRN..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 text-xs"
+            className="pl-9"
           />
         </div>
       </Card>
 
-      <Card className="overflow-hidden bg-white border-border">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#F1F5F9] text-[#475569] uppercase font-bold text-[11px] border-b border-border">
-              <tr>
-                <th className="py-3 px-4">MRN</th>
-                <th className="py-3 px-4">Patient Name</th>
-                <th className="py-3 px-4">Date of Birth</th>
-                <th className="py-3 px-4">Gender</th>
-                <th className="py-3 px-4">Contact Phone</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filtered.map((patient, idx) => (
-                <tr
-                  key={patient.id}
-                  className={`hover:bg-slate-50 transition-colors ${
-                    idx % 2 === 1 ? 'bg-[#F8FAFC]' : 'bg-white'
-                  }`}
-                >
-                  <td className="py-3 px-4 font-mono font-semibold text-primary">
-                    {patient.mrn}
-                  </td>
-                  <td className="py-3 px-4 font-semibold text-slate-900">
-                    {patient.firstName} {patient.lastName}
-                  </td>
-                  <td className="py-3 px-4 text-slate-600">{patient.dateOfBirth}</td>
-                  <td className="py-3 px-4 text-slate-600">{patient.gender}</td>
-                  <td className="py-3 px-4 font-mono text-slate-600">{patient.phone}</td>
-                  <td className="py-3 px-4">
-                    <Badge variant="success" className="text-[10px]">
-                      {patient.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4 text-right space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => alert(`PHI View audit dispatched for ${patient.firstName} ${patient.lastName}`)}
-                    >
-                      <Eye className="h-3.5 w-3.5 mr-1" /> View
-                    </Button>
-                    {canEditPatients && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => alert(`Edit patient form (Phase 4)`)}
-                      >
-                        <Edit className="h-3.5 w-3.5 mr-1" /> Edit
-                      </Button>
-                    )}
-                  </td>
+      {/* Table Card */}
+      <Card className="p-0 overflow-hidden">
+        {filtered.length === 0 ? (
+          <EmptyState
+            title="No patients found"
+            description="No patient records match your current search query. Try searching with a different name or MRN."
+            action={
+              <Button variant="outline" size="sm" onClick={() => setSearchTerm('')}>
+                Clear search
+              </Button>
+            }
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm" aria-label="Patients">
+              <thead className="bg-[#F9FAFB] text-[#6B7280] uppercase font-semibold text-xs border-b border-[#F3F4F6]">
+                <tr>
+                  <th className="py-3 px-4">MRN</th>
+                  <th className="py-3 px-4">Patient Name</th>
+                  <th className="py-3 px-4 hidden sm:table-cell">Date of Birth</th>
+                  <th className="py-3 px-4 hidden md:table-cell">Gender</th>
+                  <th className="py-3 px-4 hidden lg:table-cell">Contact Phone</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-[#F3F4F6]">
+                {filtered.map((patient) => (
+                  <tr
+                    key={patient.id}
+                    className="hover:bg-[#F9FAFB]/70 transition-colors"
+                  >
+                    <td className="py-3.5 px-4 font-mono font-medium text-[#2563EB]">
+                      {patient.mrn}
+                    </td>
+                    <td className="py-3.5 px-4 font-medium text-[#111827]">
+                      {patient.firstName} {patient.lastName}
+                    </td>
+                    <td className="py-3.5 px-4 text-[#6B7280] hidden sm:table-cell">{patient.dateOfBirth}</td>
+                    <td className="py-3.5 px-4 text-[#6B7280] hidden md:table-cell">{patient.gender}</td>
+                    <td className="py-3.5 px-4 font-mono text-[#6B7280] hidden lg:table-cell">{patient.phone}</td>
+                    <td className="py-3.5 px-4">
+                      <Badge
+                        variant={patient.status === 'ACTIVE' ? 'success' : 'secondary'}
+                        className="text-[10px]"
+                      >
+                        {patient.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 px-4 text-right space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-[#2563EB] hover:text-[#1D4ED8]"
+                      >
+                        <Eye className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> View
+                      </Button>
+                      {canEditPatients && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs text-[#374151]"
+                        >
+                          <Edit className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> Edit
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );

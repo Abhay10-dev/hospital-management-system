@@ -2,112 +2,188 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Activity, ArrowLeft, CheckCircle2, Mail, ShieldAlert } from 'lucide-react';
+import { Activity, AlertCircle, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const validate = (): boolean => {
+    if (!email) {
+      setEmailError('Email address is required.');
+      return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailError('Please enter a valid email address.');
+      return false;
+    }
+    setEmailError(null);
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
+
     setLoading(true);
-    // Simulating call to /auth/forgot-password
-    setTimeout(() => {
+    setApiError(null);
+
+    try {
+      const result = await apiClient.forgotPassword(email);
+
+      // Do NOT reveal whether the account exists — always show success
+      // unless there is a definitive server/network error.
+      if (result.status === 0 || result.status >= 500) {
+        setApiError('Unable to connect to the server. Please try again shortly.');
+        setLoading(false);
+        return;
+      }
+
+      if (result.status === 429) {
+        setApiError('Too many requests. Please wait a moment before trying again.');
+        setLoading(false);
+        return;
+      }
+
+      // Show success for any other response (200, 404 treated identically)
       setSubmitted(true);
+    } catch {
+      setApiError('An unexpected error occurred. Please try again.');
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-[#F8FAFC] p-4 sm:p-6">
+    <div className="min-h-screen flex flex-col justify-center items-center bg-[#F9FAFB] p-4 sm:p-6">
       <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <div className="inline-flex h-12 w-12 rounded-xl bg-primary/10 items-center justify-center text-primary font-black border border-primary/20 shadow-sm">
-            <Activity className="h-6 w-6 text-primary" />
+
+        {/* Brand Header */}
+        <div className="text-center space-y-3">
+          <div className="inline-flex h-14 w-14 rounded-xl bg-[#2563EB] items-center justify-center shadow-sm mx-auto">
+            <Activity className="h-7 w-7 text-white" aria-hidden="true" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#0F172A]">
-            Reset Account Access
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Hospital Management System Password Recovery
-          </p>
+          <div>
+            <h1 className="text-xl font-bold text-[#111827]">Advfiction HMS</h1>
+            <p className="text-sm text-[#6B7280] mt-1">Password recovery</p>
+          </div>
         </div>
 
-        <Card className="border-[#E2E8F0] shadow-md bg-white">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-lg font-semibold">Forgot Password</CardTitle>
-            <CardDescription className="text-xs">
-              Enter your clinical email address to receive a secure, expiring reset link.
-            </CardDescription>
-          </CardHeader>
+        {/* Card */}
+        <div className="rounded-2xl border border-[#F3F4F6] bg-white shadow-sm p-6 sm:p-8">
 
           {submitted ? (
-            <CardContent className="space-y-4">
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs space-y-2">
-                <div className="flex items-center gap-2 font-semibold text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  Reset Instructions Dispatched
+            /* Success state */
+            <div className="space-y-5">
+              <div className="flex items-start gap-3 rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-4">
+                <CheckCircle2 className="h-5 w-5 text-[#16A34A] shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-[#15803D]">Check your email</p>
+                  <p className="text-xs text-[#166534] leading-relaxed">
+                    If an account is associated with <span className="font-medium">{email}</span>,
+                    a reset link has been sent. The link expires in 60 minutes.
+                  </p>
                 </div>
-                <p className="leading-relaxed">
-                  If an account exists for <span className="font-semibold">{email}</span>, a single-use signed link has been sent. The token expires in <strong>60 minutes</strong>.
+              </div>
+
+              <Link href="/login">
+                <Button variant="outline" className="w-full gap-2">
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  Back to Sign In
+                </Button>
+              </Link>
+
+              <p className="text-center text-xs text-[#9CA3AF]">
+                Security controls enabled.
+              </p>
+            </div>
+          ) : (
+            /* Form state */
+            <>
+              <div className="mb-6">
+                <h2 className="text-sm font-semibold text-[#111827]">Forgot your password?</h2>
+                <p className="text-xs text-[#6B7280] mt-0.5">
+                  Enter your email address and we&apos;ll send you a link to reset your password.
                 </p>
               </div>
 
-              <div className="p-3 bg-slate-50 rounded border border-slate-200 text-[11px] text-muted-foreground flex items-center gap-2">
-                <ShieldAlert className="h-3.5 w-3.5 text-primary shrink-0" />
-                <span>Completing a password reset automatically revokes all other active sessions.</span>
-              </div>
+              {/* API Error Banner */}
+              {apiError && (
+                <div
+                  role="alert"
+                  className="mb-5 flex items-start gap-2.5 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#DC2626]"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+                  <span>{apiError}</span>
+                </div>
+              )}
 
-              <div className="pt-2">
-                <Link href="/login">
-                  <Button variant="outline" className="w-full gap-2">
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to Sign In
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <CardContent className="space-y-4">
+              <form onSubmit={handleSubmit} noValidate className="space-y-5">
+                {/* Email */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Clinical Email Address
+                  <label htmlFor="email" className="block text-sm font-medium text-[#374151]">
+                    Email address
                   </label>
-                  <div className="relative">
-                    <Mail className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      type="email"
-                      required
-                      placeholder="doctor@hospital.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-9 bg-white"
-                    />
-                  </div>
+                  <Input
+                    id="email"
+                    type="email"
+                    name="email"
+                    autoComplete="email"
+                    autoFocus
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (emailError) setEmailError(null);
+                    }}
+                    disabled={loading}
+                    placeholder="you@hospital.com"
+                    aria-describedby={emailError ? 'email-error' : undefined}
+                    aria-invalid={!!emailError}
+                    className={emailError ? 'border-[#FECACA] focus-visible:ring-[#DC2626]' : ''}
+                  />
+                  {emailError && (
+                    <p id="email-error" role="alert" className="text-xs text-[#DC2626]">
+                      {emailError}
+                    </p>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-slate-50 p-2.5 rounded border border-slate-200">
-                  <ShieldAlert className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <span>Rate limited to 3 requests / minute to prevent spam enumeration.</span>
-                </div>
-              </CardContent>
-
-              <CardFooter className="flex flex-col gap-3">
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? 'Transmitting...' : 'Send Expiring Reset Link'}
+                {/* Submit */}
+                <Button type="submit" disabled={loading} className="w-full" aria-busy={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      Sending reset link…
+                    </>
+                  ) : (
+                    'Send reset link'
+                  )}
                 </Button>
-                <Link href="/login" className="text-xs text-primary hover:underline text-center">
-                  Back to Sign In
-                </Link>
-              </CardFooter>
-            </form>
+
+                {/* Back link */}
+                <p className="text-center text-xs text-[#6B7280]">
+                  Remember your password?{' '}
+                  <Link
+                    href="/login"
+                    className="text-[#2563EB] hover:text-[#1D4ED8] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B82F6] rounded"
+                  >
+                    Sign in
+                  </Link>
+                </p>
+              </form>
+
+              <p className="mt-6 text-center text-xs text-[#9CA3AF]">
+                Security controls enabled.
+              </p>
+            </>
           )}
-        </Card>
+        </div>
       </div>
     </div>
   );

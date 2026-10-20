@@ -10,6 +10,7 @@ import {
   UseGuards,
   UseInterceptors,
   Req,
+  Inject,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
@@ -21,7 +22,7 @@ import { PHIInterceptor } from '../audit/phi.interceptor';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/patients')
 export class PatientsController {
-  constructor(private readonly patientsService: PatientsService) {}
+  constructor(@Inject(PatientsService) private readonly patientsService: PatientsService) {}
 
   @RequirePermissions('patient:read')
   @UseInterceptors(PHIInterceptor)

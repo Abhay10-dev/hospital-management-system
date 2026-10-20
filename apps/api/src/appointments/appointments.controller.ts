@@ -6,6 +6,7 @@ import {
   Query,
   UseGuards,
   Req,
+  Inject,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
@@ -16,7 +17,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api')
 export class AppointmentsController {
-  constructor(private readonly appointmentsService: AppointmentsService) {}
+  constructor(@Inject(AppointmentsService) private readonly appointmentsService: AppointmentsService) {}
 
   @RequirePermissions('appointment:read')
   @Get('appointments')

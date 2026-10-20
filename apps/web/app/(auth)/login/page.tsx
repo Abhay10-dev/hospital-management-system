@@ -1,227 +1,324 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { DemoAccountSelector } from '@/components/auth/DemoAccountSelector';
+import { Activity, Eye, EyeOff, AlertCircle, Loader2, ChevronDown } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 import { useRole } from '@/context/RoleContext';
 import { RoleName } from '@hospital/shared-types';
-import {
-  Activity,
-  ShieldCheck,
-  AlertCircle,
-  Eye,
-  EyeOff,
-  Lock,
-  ArrowRight,
-} from 'lucide-react';
+
+// Human-facing login roles — AI_SERVICE is excluded
+const HUMAN_ROLES: { value: RoleName; label: string; description: string }[] = [
+  { value: 'SUPER_ADMIN', label: 'Super Admin', description: 'System administration & audits' },
+  { value: 'ADMIN', label: 'Admin', description: 'Hospital operations & user accounts' },
+  { value: 'RECEPTIONIST', label: 'Receptionist', description: 'Patient registration & scheduling' },
+  { value: 'DOCTOR', label: 'Doctor', description: 'Clinical schedules & assigned patients' },
+  { value: 'NURSE', label: 'Nurse', description: 'Triage & care updates' },
+];
+
+const DEMO_PASSWORD = 'SuperSecret123#';
+
+type LoginState =
+  | 'idle'
+  | 'submitting'
+  | 'invalid_input'
+  | 'invalid_credentials'
+  | 'rate_limited'
+  | 'server_error';
 
 export default function LoginPage() {
   const router = useRouter();
   const { setRole } = useRole();
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
-  const [email, setEmail] = useState('superadmin@hospital.com');
-  const [password, setPassword] = useState('••••••••••••');
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<RoleName>('SUPER_ADMIN');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
-  const [errorBanner, setErrorBanner] = useState<string | null>(null);
-  const [attemptCount, setAttemptCount] = useState(0);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [loginState, setLoginState] = useState<LoginState>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
-  const handleLogin = (e: React.FormEvent) => {
+  const validate = (): boolean => {
+    const errors: { email?: string; password?: string } = {};
+    if (!email) errors.email = 'Email address is required.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Please enter a valid email address.';
+    if (!password) errors.password = 'Password is required.';
+    else if (password.length < 8) errors.password = 'Password must be at least 8 characters.';
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSelectDemoAccount = (demoEmail: string, demoRole: RoleName) => {
+    setEmail(demoEmail);
+    setSelectedRole(demoRole);
+    setPassword(DEMO_PASSWORD);
+    setErrorMessage(null);
+    setFieldErrors({});
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Check rate limit simulation
-    const nextAttempts = attemptCount + 1;
-    setAttemptCount(nextAttempts);
-
-    if (nextAttempts > 5) {
-      setErrorBanner('HTTP 429 Too Many Requests: Rate limit exceeded (Max 5 attempts / min per IP). Please wait 60s.');
+    if (!validate()) {
+      setLoginState('invalid_input');
       return;
     }
 
-    // Determine role by email
-    let role: RoleName = 'SUPER_ADMIN';
-    if (email.includes('admin')) role = 'ADMIN';
-    else if (email.includes('reception')) role = 'RECEPTIONIST';
-    else if (email.includes('doc')) role = 'DOCTOR';
-    else if (email.includes('nurse')) role = 'NURSE';
+    setLoginState('submitting');
+    setErrorMessage(null);
 
-    setRole(role);
-    router.push('/dashboard');
+    try {
+      // Call real API — sends email, password, role, rememberMe
+      const result = await apiClient.login(email, password, rememberMe, selectedRole);
+
+      if (result.status === 429) {
+        setLoginState('rate_limited');
+        setErrorMessage('Too many login attempts. Please wait a moment before trying again.');
+        return;
+      }
+
+      if (result.status === 401 || result.status === 403) {
+        setLoginState('invalid_credentials');
+        setErrorMessage(
+          result.error || 'Invalid credentials or your account is not authorized for the selected role.'
+        );
+        return;
+      }
+
+      if (result.status === 0 || result.status >= 500) {
+        setLoginState('server_error');
+        setErrorMessage('Unable to connect to the server. Please try again shortly.');
+        return;
+      }
+
+      if (result.error || !result.data) {
+        setLoginState('invalid_credentials');
+        setErrorMessage(result.error || 'Login failed. Please check your credentials.');
+        return;
+      }
+
+      // Success — record active session beacon in sessionStorage (distinguishes refresh from fresh launch)
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('advfiction_active_session', 'true');
+      }
+
+      // Set client-side role context from verified server response
+      const serverRole = result.data.user?.role as RoleName;
+      if (serverRole) setRole(serverRole);
+      else setRole(selectedRole);
+
+      router.push('/dashboard');
+    } catch {
+      setLoginState('server_error');
+      setErrorMessage('An unexpected error occurred. Please try again.');
+    }
   };
 
-  const handleQuickFill = (targetRole: RoleName, sampleEmail: string) => {
-    setEmail(sampleEmail);
-    setPassword('SuperSecret123#');
-    setRole(targetRole);
-  };
+  const isSubmitting = loginState === 'submitting';
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-[#F8FAFC] p-4 sm:p-6">
-      <div className="w-full max-w-md space-y-6">
+    <div className="min-h-screen flex flex-col justify-center items-center bg-[#F9FAFB] p-4 sm:p-6">
+      <div className={`w-full ${isDemoMode ? 'max-w-2xl' : 'max-w-md'} space-y-6 transition-all duration-200`}>
+
         {/* Brand Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex h-12 w-12 rounded-xl bg-primary/10 items-center justify-center text-primary font-black border border-primary/20 shadow-sm">
-            <Activity className="h-6 w-6 text-primary" />
+        <div className="text-center space-y-3">
+          <div className="inline-flex h-14 w-14 rounded-xl bg-[#2563EB] items-center justify-center shadow-sm mx-auto">
+            <Activity className="h-7 w-7 text-white" aria-hidden="true" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#0F172A]">
-            Hospital Management System
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Sign in to your clinical dashboard
-          </p>
+          <div>
+            <h1 className="text-xl font-bold text-[#111827]">Advfiction HMS</h1>
+            <p className="text-sm text-[#6B7280] mt-1">Sign in to your dashboard</p>
+          </div>
         </div>
 
         {/* Login Card */}
-        <Card className="border-[#E2E8F0] shadow-md bg-white">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-lg font-semibold">Authentication</CardTitle>
-            <CardDescription className="text-xs">
-              Enter your credentials to access authorized patient records
-            </CardDescription>
-          </CardHeader>
+        <div className="rounded-2xl border border-[#F3F4F6] bg-white shadow-sm p-6 sm:p-8 space-y-6">
 
-          <form onSubmit={handleLogin}>
-            <CardContent className="space-y-4">
-              {/* Rate limit warning banner */}
-              {errorBanner && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-600" />
-                  <span>{errorBanner}</span>
-                </div>
+          {/* Form Header */}
+          <div>
+            <h2 className="text-sm font-semibold text-[#111827]">Staff Sign In</h2>
+            <p className="text-xs text-[#6B7280] mt-0.5">
+              Select your role and enter your credentials to access the portal.
+            </p>
+          </div>
+
+          {/* Error Banner */}
+          {errorMessage && (
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#DC2626]"
+            >
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
+
+            {/* Role Selector */}
+            <div className="space-y-1.5">
+              <label htmlFor="role-select" className="block text-sm font-medium text-[#374151]">
+                Role
+              </label>
+              <div className="relative">
+                <select
+                  id="role-select"
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value as RoleName)}
+                  disabled={isSubmitting}
+                  className="w-full h-10 appearance-none rounded-xl border border-[#E5E7EB] bg-white px-3 pr-8 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#3B82F6] disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Select your role"
+                >
+                  {HUMAN_ROLES.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label} — {r.description}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9CA3AF]" aria-hidden="true" />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="block text-sm font-medium text-[#374151]">
+                Email address
+              </label>
+              <Input
+                id="email"
+                type="email"
+                name="email"
+                autoComplete="email"
+                autoFocus
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
+                }}
+                disabled={isSubmitting}
+                placeholder="you@hospital.com"
+                aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+                aria-invalid={!!fieldErrors.email}
+                className={fieldErrors.email ? 'border-[#FECACA] focus-visible:ring-[#DC2626]' : ''}
+              />
+              {fieldErrors.email && (
+                <p id="email-error" role="alert" className="text-xs text-[#DC2626]">
+                  {fieldErrors.email}
+                </p>
               )}
+            </div>
 
-              {/* Email Input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">
-                  Email Address
+            {/* Password */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="block text-sm font-medium text-[#374151]">
+                  Password
                 </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-[#2563EB] hover:text-[#1D4ED8] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B82F6] rounded"
+                  tabIndex={0}
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
                 <Input
-                  type="email"
-                  required
-                  placeholder="doctor@hospital.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="bg-white"
+                  ref={passwordInputRef}
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
+                  }}
+                  disabled={isSubmitting}
+                  placeholder="••••••••"
+                  className={`pr-10 ${fieldErrors.password ? 'border-[#FECACA] focus-visible:ring-[#DC2626]' : ''}`}
+                  aria-describedby={fieldErrors.password ? 'password-error' : undefined}
+                  aria-invalid={!!fieldErrors.password}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#6B7280] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B82F6] rounded"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={0}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </button>
               </div>
+              {fieldErrors.password && (
+                <p id="password-error" role="alert" className="text-xs text-[#DC2626]">
+                  {fieldErrors.password}
+                </p>
+              )}
+            </div>
 
-              {/* Password Input */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Password
-                  </label>
-                  <Link
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      alert('Password reset link will be dispatched via email (Phase 3).');
-                    }}
-                    className="text-xs font-medium text-primary hover:underline"
-                  >
-                    Forgot?
-                  </Link>
-                </div>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pr-10 bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
+            {/* Remember session */}
+            <div className="flex items-center gap-2">
+              <input
+                id="remember-me"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={isSubmitting}
+                className="h-4 w-4 rounded border-[#E5E7EB] text-[#2563EB] focus:ring-[#3B82F6] disabled:cursor-not-allowed"
+              />
+              <label htmlFor="remember-me" className="text-sm text-[#374151] select-none cursor-pointer">
+                Remember session for 8 hours
+              </label>
+            </div>
 
-              {/* Remember checkbox */}
-              <div className="flex items-center justify-between text-xs text-slate-600">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                  <span>Remember session for 8 hours</span>
-                </label>
-              </div>
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full"
+              aria-busy={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Signing in…
+                </>
+              ) : (
+                'Sign in'
+              )}
+            </Button>
 
-              {/* Rate limit badge info */}
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-slate-50 p-2 rounded border border-slate-200">
-                <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                <span>Rate limit protection active (Max 5 attempts / min)</span>
-              </div>
-            </CardContent>
-
-            <CardFooter className="flex flex-col gap-3">
-              <Button type="submit" className="w-full">
-                Sign In to Hospital Portal
-              </Button>
-            </CardFooter>
           </form>
 
-          {/* Quick Demo Persona Fill */}
-          <div className="p-4 bg-slate-50 border-t border-slate-100 rounded-b-lg space-y-2">
-            <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
-              Demo Quick-Fill Personas:
-            </p>
-            <div className="grid grid-cols-2 gap-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-xs h-7 justify-start"
-                onClick={() => handleQuickFill('SUPER_ADMIN', 'superadmin@hospital.com')}
-              >
-                Super Admin
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-xs h-7 justify-start"
-                onClick={() => handleQuickFill('ADMIN', 'admin@hospital.com')}
-              >
-                Admin
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-xs h-7 justify-start"
-                onClick={() => handleQuickFill('RECEPTIONIST', 'reception@hospital.com')}
-              >
-                Receptionist
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-xs h-7 justify-start"
-                onClick={() => handleQuickFill('DOCTOR', 'doctor@hospital.com')}
-              >
-                Doctor
-              </Button>
+          {/* Demo Accounts Selector — Placed at the bottom of the card */}
+          {isDemoMode && (
+            <div className="pt-6 border-t border-[#F3F4F6]">
+              <DemoAccountSelector
+                selectedRole={selectedRole}
+                selectedEmail={email}
+                onSelectAccount={handleSelectDemoAccount}
+                disabled={isSubmitting}
+              />
             </div>
-          </div>
-        </Card>
+          )}
 
-        {/* Regulatory Footer */}
-        <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1.5">
-          <Lock className="h-3.5 w-3.5 text-emerald-600" />
-          Protected by HIPAA & GDPR Compliance Rules
-        </p>
+          {/* Footer */}
+          <p className="pt-2 text-center text-xs text-[#9CA3AF]">
+            Security controls enabled. This system is for authorized staff only.
+          </p>
+        </div>
       </div>
     </div>
   );

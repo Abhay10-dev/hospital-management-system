@@ -3,23 +3,19 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRole } from '@/context/RoleContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { AuditLogItem } from '@hospital/shared-types';
 import {
-  ShieldAlert,
-  ShieldX,
-  ArrowLeft,
   Download,
   RotateCw,
   Search,
-  Filter,
-  CheckCircle2,
-  FileCode2,
   X,
   Lock,
+  FileCode2,
 } from 'lucide-react';
 
 const MOCK_AUDIT_LOGS: AuditLogItem[] = [
@@ -78,61 +74,44 @@ const MOCK_AUDIT_LOGS: AuditLogItem[] = [
     action: 'patient.update',
     auditableType: 'Patient',
     auditableId: 'pat_3088',
-    ipAddress: '192.168.1.40',
+    ipAddress: '192.168.1.44',
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
     performedAt: '2026-10-18T13:55:18Z',
-    oldValues: { phone: '+1-555-0100', status: 'PENDING' },
-    newValues: { phone: '+1-555-0199', status: 'CONFIRMED' },
+    oldValues: { phone: '+1-555-0100', address: '12 Elm Street' },
+    newValues: { phone: '+1-555-0199', address: '45 Oak Avenue' },
   },
   {
     id: 'aud_90816',
-    userId: null,
-    userName: 'SYSTEM',
-    userRole: 'SYSTEM',
-    action: 'auth.login_fail',
-    auditableType: 'User',
-    auditableId: 'usr_1002',
-    ipAddress: '203.0.113.19',
-    userAgent: 'Python-requests/2.31.0',
-    performedAt: '2026-10-18T13:00:11Z',
-    oldValues: null,
-    newValues: { reason: 'INVALID_CREDENTIALS', consecutiveFailures: 3 },
+    userId: 'usr_nurse_05',
+    userName: 'Nurse Joy',
+    userRole: 'NURSE',
+    action: 'appointment.update',
+    auditableType: 'Appointment',
+    auditableId: 'apt_995',
+    ipAddress: '10.0.8.22',
+    userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)',
+    performedAt: '2026-10-18T13:40:00Z',
+    oldValues: { status: 'SCHEDULED' },
+    newValues: { status: 'CONFIRMED', triageNotes: 'Vitals normal' },
   },
 ];
 
 export default function AuditLogsPage() {
   const { currentRole, canAccessAuditLogs } = useRole();
-  const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [actionFilter, setActionFilter] = useState('ALL');
   const [entityFilter, setEntityFilter] = useState('ALL');
+  const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
 
-  // RBAC Access Evaluation: 403 Access Forbidden Screen
+  // RBAC Evaluation: 403 Access Forbidden for non-SUPER_ADMIN
   if (!canAccessAuditLogs) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 space-y-4">
-        <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center text-red-600 border border-red-200">
-          <ShieldX className="h-8 w-8" />
-        </div>
-        <div className="space-y-1.5 max-w-md">
-          <h1 className="text-2xl font-bold text-slate-900">403 — Access Forbidden</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            The Audit Trail Log is write-only and restricted strictly to{' '}
-            <span className="font-semibold text-purple-700">SUPER_ADMIN</span> roles in compliance with HIPAA & GDPR governance.
-          </p>
-          <p className="text-xs text-slate-500 pt-1">
-            Current role: <span className="font-mono font-bold text-slate-700">{currentRole}</span>
-          </p>
-        </div>
-        <div className="pt-2 flex gap-3">
-          <Link href="/dashboard">
-            <Button variant="default" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Return to Dashboard
-            </Button>
-          </Link>
-        </div>
-      </div>
+      <AccessDenied
+        title="403 — Access Restricted"
+        description="The Audit Trail Log is an append-only store restricted strictly to the Super Admin role. Your current account does not have authorization to view security audit logs."
+        backHref="/dashboard"
+        backLabel="Return to Dashboard"
+      />
     );
   }
 
@@ -155,11 +134,11 @@ export default function AuditLogsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-foreground">AUDIT TRAIL LOGS</h1>
-            <Badge variant="superadmin">SUPER ADMIN ONLY</Badge>
+            <h2 className="text-xl font-bold text-[#111827]">Audit Trail Logs</h2>
+            <Badge variant="superadmin">Super Admin Only</Badge>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Immutable security tracking of system events and PHI access (write-only append store)
+          <p className="text-sm text-[#6B7280]">
+            Review security events and sensitive data access. Designed with privacy safeguards.
           </p>
         </div>
 
@@ -167,34 +146,34 @@ export default function AuditLogsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => alert('Exporting signed audit snapshot CSV (Phase 5)...')}
+            onClick={() => alert('Audit snapshot export generated.')}
             className="gap-1.5"
           >
-            <Download className="h-4 w-4" />
-            Download CSV
+            <Download className="h-4 w-4" aria-hidden="true" />
+            Export CSV
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => alert('Refreshed audit entries.')}
+            onClick={() => alert('Audit entries refreshed.')}
             className="gap-1.5"
           >
-            <RotateCw className="h-4 w-4" />
+            <RotateCw className="h-4 w-4" aria-hidden="true" />
             Refresh
           </Button>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <Card className="p-4 bg-white border-border">
+      {/* Filter Card */}
+      <Card>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div className="relative">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" aria-hidden="true" />
             <Input
               placeholder="Search Actor or ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 text-xs"
+              className="pl-9"
             />
           </div>
 
@@ -202,14 +181,15 @@ export default function AuditLogsPage() {
             <select
               value={actionFilter}
               onChange={(e) => setActionFilter(e.target.value)}
-              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-xs focus:ring-1 focus:ring-primary"
+              className="w-full h-10 rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+              aria-label="Filter by action"
             >
               <option value="ALL">All Actions</option>
               <option value="user.role_change">user.role_change</option>
-              <option value="patient.read">patient.read (PHI Access)</option>
+              <option value="patient.read">patient.read</option>
               <option value="patient.update">patient.update</option>
-              <option value="booking.create">booking.create (AI Service)</option>
-              <option value="auth.login_fail">auth.login_fail</option>
+              <option value="booking.create">booking.create</option>
+              <option value="appointment.update">appointment.update</option>
             </select>
           </div>
 
@@ -217,7 +197,8 @@ export default function AuditLogsPage() {
             <select
               value={entityFilter}
               onChange={(e) => setEntityFilter(e.target.value)}
-              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-xs focus:ring-1 focus:ring-primary"
+              className="w-full h-10 rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+              aria-label="Filter by entity type"
             >
               <option value="ALL">All Entities</option>
               <option value="Patient">Patient</option>
@@ -226,63 +207,63 @@ export default function AuditLogsPage() {
             </select>
           </div>
 
-          <div className="flex items-center justify-end text-xs text-muted-foreground">
+          <div className="flex items-center justify-end text-xs text-[#6B7280]">
             Showing {filteredLogs.length} matching entries
           </div>
         </div>
       </Card>
 
       {/* Audit Log Table */}
-      <Card className="overflow-hidden border-border bg-white shadow-sm">
+      <Card className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#F1F5F9] text-[#475569] uppercase font-bold text-[11px] border-b border-border">
+          <table className="w-full text-left text-sm" aria-label="Audit Logs">
+            <thead className="bg-[#F9FAFB] text-[#6B7280] uppercase font-semibold text-xs border-b border-[#F3F4F6]">
               <tr>
                 <th className="py-3 px-4">Timestamp (UTC)</th>
                 <th className="py-3 px-4">Actor</th>
-                <th className="py-3 px-4">Action</th>
-                <th className="py-3 px-4">Resource</th>
-                <th className="py-3 px-4">Entity ID</th>
-                <th className="py-3 px-4">IP Address</th>
-                <th className="py-3 px-4 text-right">Diff Snapshot</th>
+                <th className="py-3 px-4 hidden sm:table-cell">Action</th>
+                <th className="py-3 px-4 hidden md:table-cell">Resource</th>
+                <th className="py-3 px-4 hidden lg:table-cell">Entity ID</th>
+                <th className="py-3 px-4 hidden lg:table-cell">IP Address</th>
+                <th className="py-3 px-4 text-right">Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {filteredLogs.map((log, idx) => (
+            <tbody className="divide-y divide-[#F3F4F6]">
+              {filteredLogs.map((log) => (
                 <tr
                   key={log.id}
-                  className={`hover:bg-[#F1F5F9] transition-colors ${
-                    idx % 2 === 1 ? 'bg-[#F8FAFC]' : 'bg-white'
-                  }`}
+                  className="hover:bg-[#F9FAFB]/70 transition-colors"
                 >
-                  <td className="py-3 px-4 font-mono text-slate-600 whitespace-nowrap">
+                  <td className="py-3.5 px-4 font-mono text-xs text-[#6B7280] whitespace-nowrap">
                     {new Date(log.performedAt).toLocaleString('en-US', {
                       timeZone: 'UTC',
                       hour12: false,
-                    })}
+                    })} UTC
                   </td>
-                  <td className="py-3 px-4 whitespace-nowrap">
-                    <span className="font-semibold text-slate-900">{log.userName}</span>
-                    <span className="block text-[10px] text-muted-foreground">
-                      {log.userRole || 'AI / System'}
-                    </span>
+                  <td className="py-3.5 px-4">
+                    <div className="font-medium text-[#111827]">{log.userName || 'System'}</div>
+                    <div className="text-xs text-[#6B7280]">{log.userRole || 'AI_SERVICE'}</div>
                   </td>
-                  <td className="py-3 px-4 font-mono font-medium text-slate-800">
-                    <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">
-                      {log.action}
-                    </span>
+                  <td className="py-3.5 px-4 font-mono text-xs text-[#374151] hidden sm:table-cell">
+                    {log.action}
                   </td>
-                  <td className="py-3 px-4 text-slate-700">{log.auditableType}</td>
-                  <td className="py-3 px-4 font-mono text-slate-600">{log.auditableId}</td>
-                  <td className="py-3 px-4 font-mono text-slate-500">{log.ipAddress || '—'}</td>
-                  <td className="py-3 px-4 text-right">
+                  <td className="py-3.5 px-4 text-xs text-[#6B7280] hidden md:table-cell">
+                    {log.auditableType}
+                  </td>
+                  <td className="py-3.5 px-4 font-mono text-xs text-[#2563EB] hidden lg:table-cell">
+                    {log.auditableId}
+                  </td>
+                  <td className="py-3.5 px-4 font-mono text-xs text-[#6B7280] hidden lg:table-cell">
+                    {log.ipAddress}
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
+                      className="h-8 text-xs text-[#2563EB] hover:text-[#1D4ED8]"
                       onClick={() => setSelectedLog(log)}
-                      className="h-7 px-2.5 text-xs text-primary font-medium hover:bg-primary/10"
                     >
-                      [View Diff]
+                      <FileCode2 className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> View Diff
                     </Button>
                   </td>
                 </tr>
@@ -291,54 +272,54 @@ export default function AuditLogsPage() {
           </table>
         </div>
 
-        {/* Footer info: Immutability reminder */}
-        <div className="p-3 bg-slate-50 border-t border-border flex flex-col sm:flex-row items-center justify-between text-[11px] text-muted-foreground gap-2">
-          <div className="flex items-center gap-1.5 text-emerald-800 font-medium">
-            <Lock className="h-3.5 w-3.5 text-emerald-600" />
-            Append-only store: DELETE and UPDATE operations strictly disabled at PostgreSQL layer
+        <div className="p-4 border-t border-[#F3F4F6] text-xs text-[#6B7280] flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Lock className="h-3.5 w-3.5 text-[#10B981]" aria-hidden="true" />
+            <span>Immutable write-only audit trail</span>
           </div>
-          <div>Showing 1 – {filteredLogs.length} of 1,248 entries</div>
+          <div>Showing 1 – {filteredLogs.length} of {filteredLogs.length} entries</div>
         </div>
       </Card>
 
-      {/* JSON Diff Side Drawer Modal */}
+      {/* JSON Diff Detail Drawer Modal */}
       {selectedLog && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-[#111827]/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-[#F3F4F6] w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border bg-slate-50">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#F3F4F6]">
               <div>
-                <h3 className="font-semibold text-slate-900 text-sm">
-                  Audit Event Details: {selectedLog.action} (#{selectedLog.id})
+                <h3 className="font-semibold text-[#111827] text-sm">
+                  Audit Event: {selectedLog.action} (#{selectedLog.id})
                 </h3>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-[#6B7280]">
                   Entity: {selectedLog.auditableType} ({selectedLog.auditableId})
                 </p>
               </div>
               <button
                 onClick={() => setSelectedLog(null)}
-                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200"
+                className="p-1 rounded-lg text-[#9CA3AF] hover:text-[#111827] hover:bg-[#F3F4F6]"
+                aria-label="Close details"
               >
-                <X className="h-5 w-5" />
+                <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
 
-            {/* Modal Content */}
-            <div className="p-4 overflow-y-auto space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+            {/* Modal Body */}
+            <div className="px-6 py-5 overflow-y-auto space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-4 bg-[#F9FAFB] p-4 rounded-xl border border-[#F3F4F6]">
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">Performed By</span>
-                  <span className="font-semibold text-slate-900">{selectedLog.userName}</span>
-                  <span className="text-slate-500 block text-[10px]">({selectedLog.userRole})</span>
+                  <span className="text-[#6B7280] block text-[11px]">Actor</span>
+                  <span className="font-semibold text-[#111827]">{selectedLog.userName}</span>
+                  <span className="text-[#6B7280] block text-[10px]">({selectedLog.userRole})</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">Timestamp & IP</span>
-                  <span className="font-mono text-slate-800 block">{selectedLog.performedAt}</span>
-                  <span className="font-mono text-slate-500 text-[10px]">{selectedLog.ipAddress}</span>
+                  <span className="text-[#6B7280] block text-[11px]">Timestamp & IP</span>
+                  <span className="font-mono text-[#111827] block">{selectedLog.performedAt}</span>
+                  <span className="font-mono text-[#6B7280] text-[10px]">{selectedLog.ipAddress}</span>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-muted-foreground block text-[11px]">User Agent</span>
-                  <span className="font-mono text-slate-600 text-[10px] break-all">
+                  <span className="text-[#6B7280] block text-[11px]">User Agent</span>
+                  <span className="font-mono text-[#6B7280] text-[10px] break-all">
                     {selectedLog.userAgent}
                   </span>
                 </div>
@@ -346,13 +327,13 @@ export default function AuditLogsPage() {
 
               {/* Data Mutation Snapshot: Before & After */}
               <div>
-                <p className="font-bold uppercase tracking-wider text-[11px] text-slate-700 mb-2">
+                <p className="font-semibold uppercase tracking-wider text-[11px] text-[#6B7280] mb-2">
                   Data Mutation Snapshot (JSON Diff)
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Before / Old Values */}
-                  <div className="p-3 rounded-lg bg-[#FEF2F2] border border-red-200">
-                    <span className="text-red-900 font-bold block mb-1 text-[11px]">
+                  <div className="p-3 rounded-xl bg-[#FEF2F2] border border-[#FECACA]">
+                    <span className="text-[#DC2626] font-semibold block mb-1 text-[11px]">
                       BEFORE (old_values)
                     </span>
                     <pre className="font-mono text-[11px] text-[#991B1B] overflow-x-auto whitespace-pre-wrap">
@@ -363,11 +344,11 @@ export default function AuditLogsPage() {
                   </div>
 
                   {/* After / New Values */}
-                  <div className="p-3 rounded-lg bg-[#F0FDF4] border border-emerald-200">
-                    <span className="text-emerald-900 font-bold block mb-1 text-[11px]">
+                  <div className="p-3 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0]">
+                    <span className="text-[#047857] font-semibold block mb-1 text-[11px]">
                       AFTER (new_values)
                     </span>
-                    <pre className="font-mono text-[11px] text-[#166534] overflow-x-auto whitespace-pre-wrap">
+                    <pre className="font-mono text-[11px] text-[#065F46] overflow-x-auto whitespace-pre-wrap">
                       {selectedLog.newValues
                         ? JSON.stringify(selectedLog.newValues, null, 2)
                         : '(null)'}
@@ -376,16 +357,16 @@ export default function AuditLogsPage() {
                 </div>
               </div>
 
-              <div className="p-2.5 bg-amber-50 rounded border border-amber-200 text-amber-800 text-[11px] flex items-center gap-2">
-                <Lock className="h-4 w-4 shrink-0 text-amber-600" />
+              <div className="p-3 bg-[#FFFBEB] rounded-xl border border-[#FDE68A] text-[#D97706] text-xs flex items-center gap-2">
+                <Lock className="h-4 w-4 shrink-0 text-[#D97706]" aria-hidden="true" />
                 <span>
-                  This entry is permanently signed and stored in an immutable record under HIPAA compliance guidelines.
+                  This record is permanently signed and append-only. Passwords and credentials are never captured.
                 </span>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="p-3 border-t border-border bg-slate-50 flex justify-end">
+            <div className="px-6 py-3 border-t border-[#F3F4F6] bg-[#F9FAFB] flex justify-end">
               <Button size="sm" onClick={() => setSelectedLog(null)}>
                 Close Viewer
               </Button>
