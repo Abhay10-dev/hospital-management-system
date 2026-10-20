@@ -31,41 +31,55 @@ export default function DashboardLayout({
 
         if (res.status === 200 && res.data?.user) {
           // If in an active in-tab session or valid session cookie, set user
-          if (hasActiveSessionBeacon) {
-            setUser({
-              id: res.data.user.id,
-              email: res.data.user.email,
-              fullName: res.data.user.fullName,
-              role: res.data.user.role,
-              permissions: res.data.user.permissions || [],
-            });
-            setIsVerifying(false);
-            return;
-          }
-
-          // If no active session beacon was found (fresh launch of browser window)
-          // Require re-authentication unless user already has active context
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem('advfiction_active_session', 'true');
-          }
-          setUser({
+          const verifiedUser = {
             id: res.data.user.id,
             email: res.data.user.email,
             fullName: res.data.user.fullName,
             role: res.data.user.role,
             permissions: res.data.user.permissions || [],
-          });
-          setIsVerifying(false);
-        } else {
-          // Unauthenticated -> redirect to login
+          };
           if (typeof window !== 'undefined') {
-            sessionStorage.removeItem('advfiction_active_session');
+            sessionStorage.setItem('advfiction_active_session', 'true');
+            sessionStorage.setItem('advfiction_user', JSON.stringify(verifiedUser));
           }
-          router.replace('/login');
+          setUser(verifiedUser);
+          setIsVerifying(false);
+          return;
         }
+
+        // If backend returned non-200 (e.g. status 0 from CORS/network error, or standalone Vercel demo)
+        // Retain the active in-tab session if present
+        if (hasActiveSessionBeacon) {
+          try {
+            const savedUserStr = sessionStorage.getItem('advfiction_user');
+            if (savedUserStr) {
+              const savedUser = JSON.parse(savedUserStr);
+              if (savedUser && savedUser.role) {
+                setUser(savedUser);
+                setIsVerifying(false);
+                return;
+              }
+            }
+          } catch {
+            // fallback
+          }
+          setIsVerifying(false);
+          return;
+        }
+
+        // Unauthenticated and no active session beacon -> redirect to login
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('advfiction_active_session');
+          sessionStorage.removeItem('advfiction_user');
+        }
+        router.replace('/login');
       } catch {
-        // Backend offline or error -> allow mock/demo navigation to proceed
-        setIsVerifying(false);
+        // Backend offline or error -> check if we have a demo session
+        if (hasActiveSessionBeacon) {
+          setIsVerifying(false);
+          return;
+        }
+        router.replace('/login');
       }
     }
 
