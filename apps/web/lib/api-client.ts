@@ -1,11 +1,19 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const getCleanBaseUrl = (): string => {
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  return raw.trim().replace(/\/+$/, '');
+};
 
 class ApiClient {
+  private getBaseUrl(): string {
+    return getCleanBaseUrl();
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<{ data?: T; error?: string; status: number }> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${this.getBaseUrl()}${cleanEndpoint}`;
     const headers = {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
