@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { RoleName, UserSession, ROLE_PERMISSIONS } from '@hospital/shared-types';
 import apiClient from '@/lib/api-client';
 
@@ -30,18 +30,45 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<UserSession>(UNAUTHENTICATED_USER);
   const [currentRole, setCurrentRole] = useState<RoleName>('RECEPTIONIST');
 
+  // Hydrate session from sessionStorage on mount (survives tab refreshes on Vercel)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const activeSession = sessionStorage.getItem('advfiction_active_session');
+      const savedUserStr = sessionStorage.getItem('advfiction_user');
+      if (activeSession === 'true' && savedUserStr) {
+        const savedUser = JSON.parse(savedUserStr) as UserSession;
+        if (savedUser && savedUser.role) {
+          setCurrentUser(savedUser);
+          setCurrentRole(savedUser.role);
+        }
+      }
+    } catch {
+      // Ignore parse errors or unavailable storage
+    }
+  }, []);
+
   const setRole = useCallback((role: RoleName) => {
     setCurrentRole(role);
-    setCurrentUser((prev) => ({
-      ...prev,
-      role,
-      permissions: ROLE_PERMISSIONS[role] || [],
-    }));
+    setCurrentUser((prev) => {
+      const updated = {
+        ...prev,
+        role,
+        permissions: ROLE_PERMISSIONS[role] || [],
+      };
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('advfiction_user', JSON.stringify(updated));
+      }
+      return updated;
+    });
   }, []);
 
   const setUser = useCallback((user: UserSession) => {
     setCurrentUser(user);
     setCurrentRole(user.role);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('advfiction_user', JSON.stringify(user));
+    }
   }, []);
 
   const logout = useCallback(async () => {
@@ -52,6 +79,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     }
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('advfiction_active_session');
+      sessionStorage.removeItem('advfiction_user');
     }
     setCurrentUser(UNAUTHENTICATED_USER);
     setCurrentRole('RECEPTIONIST');
