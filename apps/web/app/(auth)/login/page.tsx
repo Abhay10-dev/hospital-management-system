@@ -9,7 +9,7 @@ import { DemoAccountSelector } from '@/components/auth/DemoAccountSelector';
 import { Activity, Eye, EyeOff, AlertCircle, Loader2, ChevronDown } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useRole } from '@/context/RoleContext';
-import { RoleName } from '@hospital/shared-types';
+import { RoleName, ROLE_PERMISSIONS } from '@hospital/shared-types';
 
 // Human-facing login roles — AI_SERVICE is excluded
 const HUMAN_ROLES: { value: RoleName; label: string; description: string }[] = [
@@ -22,6 +22,34 @@ const HUMAN_ROLES: { value: RoleName; label: string; description: string }[] = [
 
 const DEMO_PASSWORD = 'SuperSecret123#';
 
+const DEMO_ACCOUNTS: Record<string, { role: RoleName; fullName: string; id: string }> = {
+  'superadmin@hospital.com': {
+    role: 'SUPER_ADMIN',
+    fullName: 'Super Admin (System Owner)',
+    id: 'demo-superadmin-01',
+  },
+  'admin@hospital.com': {
+    role: 'ADMIN',
+    fullName: 'Hospital Administrator',
+    id: 'demo-admin-01',
+  },
+  'reception@hospital.com': {
+    role: 'RECEPTIONIST',
+    fullName: 'Reception Desk',
+    id: 'demo-reception-01',
+  },
+  'doctor@hospital.com': {
+    role: 'DOCTOR',
+    fullName: 'Dr. Arthur Vance',
+    id: 'demo-doctor-01',
+  },
+  'nurse@hospital.com': {
+    role: 'NURSE',
+    fullName: 'Nurse Joy',
+    id: 'demo-nurse-01',
+  },
+};
+
 type LoginState =
   | 'idle'
   | 'submitting'
@@ -32,10 +60,11 @@ type LoginState =
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setRole } = useRole();
+  const { setRole, setUser } = useRole();
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  // Enabled by default on local dev and Vercel deployments unless explicitly set to 'false'
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -74,6 +103,9 @@ export default function LoginPage() {
     setLoginState('submitting');
     setErrorMessage(null);
 
+    const normalizedEmail = email.toLowerCase().trim();
+    const demoAccount = DEMO_ACCOUNTS[normalizedEmail];
+
     try {
       // Call real API — sends email, password, role, rememberMe
       const result = await apiClient.login(email, password, rememberMe, selectedRole);
@@ -92,6 +124,59 @@ export default function LoginPage() {
         return;
       }
 
+      // Live backend response succeeded
+      if (result.data?.user) {
+        const serverRole = (result.data.user?.role || selectedRole) as RoleName;
+        const serverUser = {
+          id: result.data.user.id || (demoAccount ? demoAccount.id : 'usr-1'),
+          email: result.data.user.email || email,
+          fullName: result.data.user.fullName || (demoAccount ? demoAccount.fullName : 'Hospital Staff'),
+          role: serverRole,
+          permissions: result.data.user.permissions || ROLE_PERMISSIONS[serverRole] || [],
+        };
+
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('advfiction_active_session', 'true');
+          sessionStorage.setItem('advfiction_user', JSON.stringify(serverUser));
+        }
+
+        setUser(serverUser);
+        router.push('/dashboard');
+        return;
+      }
+
+      // Backend unreachable (e.g. standalone Vercel frontend deployment without separate API host)
+      if (isDemoMode && demoAccount) {
+        if (selectedRole !== demoAccount.role) {
+          setLoginState('invalid_credentials');
+          setErrorMessage('Invalid credentials or your account is not authorized for the selected role.');
+          return;
+        }
+
+        if (password !== DEMO_PASSWORD) {
+          setLoginState('invalid_credentials');
+          setErrorMessage('Invalid credentials or your account is not authorized for the selected role.');
+          return;
+        }
+
+        const demoUser = {
+          id: demoAccount.id,
+          email: normalizedEmail,
+          fullName: demoAccount.fullName,
+          role: demoAccount.role,
+          permissions: ROLE_PERMISSIONS[demoAccount.role] || [],
+        };
+
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('advfiction_active_session', 'true');
+          sessionStorage.setItem('advfiction_user', JSON.stringify(demoUser));
+        }
+
+        setUser(demoUser);
+        router.push('/dashboard');
+        return;
+      }
+
       if (result.status === 0 || result.status >= 500) {
         setLoginState('server_error');
         setErrorMessage('Unable to connect to the server. Please try again shortly.');
@@ -103,19 +188,25 @@ export default function LoginPage() {
         setErrorMessage(result.error || 'Login failed. Please check your credentials.');
         return;
       }
-
-      // Success — record active session beacon in sessionStorage (distinguishes refresh from fresh launch)
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('advfiction_active_session', 'true');
+    } catch {
+      // Fallback for demo accounts when network throws (e.g. CORS or offline Vercel demo)
+      if (isDemoMode && demoAccount && password === DEMO_PASSWORD && selectedRole === demoAccount.role) {
+        const demoUser = {
+          id: demoAccount.id,
+          email: normalizedEmail,
+          fullName: demoAccount.fullName,
+          role: demoAccount.role,
+          permissions: ROLE_PERMISSIONS[demoAccount.role] || [],
+        };
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('advfiction_active_session', 'true');
+          sessionStorage.setItem('advfiction_user', JSON.stringify(demoUser));
+        }
+        setUser(demoUser);
+        router.push('/dashboard');
+        return;
       }
 
-      // Set client-side role context from verified server response
-      const serverRole = result.data.user?.role as RoleName;
-      if (serverRole) setRole(serverRole);
-      else setRole(selectedRole);
-
-      router.push('/dashboard');
-    } catch {
       setLoginState('server_error');
       setErrorMessage('An unexpected error occurred. Please try again.');
     }
