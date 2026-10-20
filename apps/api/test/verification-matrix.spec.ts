@@ -2,8 +2,9 @@ import { stripSecrets } from '../src/common/utils/secret-stripper';
 import * as argon2 from 'argon2';
 import { RolesGuard, AuditLogImmutabilityGuard } from '../src/rbac/rbac.guard';
 import { Reflector } from '@nestjs/core';
-import { ExecutionContext, ForbiddenException, MethodNotAllowedException } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, MethodNotAllowedException, UnauthorizedException } from '@nestjs/common';
 import { AuditController } from '../src/audit/audit.controller';
+import { AuthService } from '../src/auth/auth.service';
 
 describe('Requirement Verification Matrix Tests', () => {
   describe('NFR-1.2: Argon2id Password Hashing & Security', () => {
@@ -129,6 +130,82 @@ describe('Requirement Verification Matrix Tests', () => {
       expect(() => controller.deleteAuditLog('aud_12345')).toThrow(
         MethodNotAllowedException
       );
+    });
+  });
+
+  describe('Demo Account Login & Auth Hardening (validateUser)', () => {
+    let authService: AuthService;
+    let mockUsersService: any;
+    let validHash: string;
+
+    beforeEach(async () => {
+      mockUsersService = {
+        findByEmailWithHash: jest.fn(),
+      };
+      const mockPrisma = {} as any;
+      const mockJwt = {} as any;
+      authService = new AuthService(mockPrisma, mockUsersService, mockJwt);
+      validHash = await authService.hashPassword('SuperSecret123#');
+    });
+
+    it('should validate user when credentials and selected role match', async () => {
+      mockUsersService.findByEmailWithHash.mockResolvedValue({
+        id: 'usr_doc_01',
+        email: 'doctor@hospital.com',
+        fullName: 'Dr. Sarah Jenkins',
+        passwordHash: validHash,
+        isActive: true,
+        role: { name: 'DOCTOR' },
+      });
+
+      const user = await authService.validateUser('doctor@hospital.com', 'SuperSecret123#', 'DOCTOR');
+      expect(user).toBeDefined();
+      expect(user.id).toBe('usr_doc_01');
+      expect(user.passwordHash).toBeUndefined(); // Never expose hash
+    });
+
+    it('should reject when selected role does not match user account role', async () => {
+      mockUsersService.findByEmailWithHash.mockResolvedValue({
+        id: 'usr_doc_01',
+        email: 'doctor@hospital.com',
+        fullName: 'Dr. Sarah Jenkins',
+        passwordHash: validHash,
+        isActive: true,
+        role: { name: 'DOCTOR' },
+      });
+
+      // User selects ADMIN, but account is DOCTOR
+      const user = await authService.validateUser('doctor@hospital.com', 'SuperSecret123#', 'ADMIN');
+      expect(user).toBeNull();
+    });
+
+    it('should throw UnauthorizedException when account is inactive (isActive: false)', async () => {
+      mockUsersService.findByEmailWithHash.mockResolvedValue({
+        id: 'usr_disabled_01',
+        email: 'disabled@hospital.com',
+        fullName: 'Inactive Staff',
+        passwordHash: validHash,
+        isActive: false,
+        role: { name: 'NURSE' },
+      });
+
+      await expect(
+        authService.validateUser('disabled@hospital.com', 'SuperSecret123#', 'NURSE')
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should reject when AI_SERVICE is attempted as a human login role', async () => {
+      mockUsersService.findByEmailWithHash.mockResolvedValue({
+        id: 'usr_ai_01',
+        email: 'ai@hospital.com',
+        fullName: 'AI Voice Service',
+        passwordHash: validHash,
+        isActive: true,
+        role: { name: 'AI_SERVICE' },
+      });
+
+      const user = await authService.validateUser('ai@hospital.com', 'SuperSecret123#', 'AI_SERVICE');
+      expect(user).toBeNull();
     });
   });
 });

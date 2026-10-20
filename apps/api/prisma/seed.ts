@@ -152,12 +152,13 @@ async function main() {
     if (!roleId) continue;
     await prisma.user.upsert({
       where: { email: u.email },
-      update: { roleId, passwordHash: defaultPassword },
+      update: { roleId, fullName: u.fullName },
       create: {
         email: u.email,
         fullName: u.fullName,
         passwordHash: defaultPassword,
         roleId,
+        isActive: true,
       },
     });
   }
@@ -193,29 +194,44 @@ async function main() {
     },
   });
 
-  // 5. Initial Fictional Appointment
-  await prisma.appointment.create({
-    data: {
+  // 5. Initial Fictional Appointment (idempotent)
+  const existingAppointment = await prisma.appointment.findFirst({
+    where: {
       patientId: patient1.id,
-      doctorId: 'doc_sarah_jenkins',
       department: 'Cardiology',
-      scheduledStart: new Date(Date.now() + 24 * 3600 * 1000),
-      scheduledEnd: new Date(Date.now() + 24 * 3600 * 1000 + 30 * 60 * 1000),
-      status: 'CONFIRMED',
-      notes: 'Initial cardiac stress assessment',
     },
   });
+  if (!existingAppointment) {
+    await prisma.appointment.create({
+      data: {
+        patientId: patient1.id,
+        doctorId: 'doc_sarah_jenkins',
+        department: 'Cardiology',
+        scheduledStart: new Date(Date.now() + 24 * 3600 * 1000),
+        scheduledEnd: new Date(Date.now() + 24 * 3600 * 1000 + 30 * 60 * 1000),
+        status: 'CONFIRMED',
+        notes: 'Initial cardiac stress assessment',
+      },
+    });
+  }
 
-  // 6. Initial Audit Log
-  await prisma.auditLog.create({
-    data: {
-      action: 'SYSTEM_SEED',
-      auditableType: 'System',
+  // 6. Initial Audit Log (idempotent)
+  const existingAuditLog = await prisma.auditLog.findFirst({
+    where: {
       auditableId: 'initial_seed',
-      newValues: { message: 'Seed data successfully loaded with HIPAA compliant defaults' },
-      performedAt: new Date(),
     },
   });
+  if (!existingAuditLog) {
+    await prisma.auditLog.create({
+      data: {
+        action: 'SYSTEM_SEED',
+        auditableType: 'System',
+        auditableId: 'initial_seed',
+        newValues: { message: 'Seed data successfully loaded with privacy safeguards' },
+        performedAt: new Date(),
+      },
+    });
+  }
 
   console.log('✅ Database seeded successfully!');
 }

@@ -23,7 +23,7 @@ export class PHIInterceptor implements NestInterceptor {
   private readonly options: PHIInterceptorOptions;
 
   constructor(
-    private readonly auditService: AuditService,
+    @Inject(AuditService) private readonly auditService: AuditService,
     @Optional() @Inject('PHI_OPTIONS') options?: PHIInterceptorOptions,
   ) {
     this.options = options || { action: 'PATIENT_VIEW', auditableType: 'Patient' };

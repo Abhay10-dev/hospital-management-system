@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
+  Inject,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
@@ -21,9 +22,9 @@ const ARGON2_OPTIONS: argon2.Options = {
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(UsersService) private readonly usersService: UsersService,
+    @Inject(JwtService) private readonly jwtService: JwtService,
   ) {}
 
   // ─── Password Utilities ───────────────────────────────────────────────────
@@ -44,12 +45,26 @@ export class AuthService {
 
   // ─── Validate User (used by LocalStrategy) ───────────────────────────────
 
-  async validateUser(email: string, password: string) {
+  async validateUser(email: string, password: string, selectedRole?: string) {
     const user = await this.usersService.findByEmailWithHash(email);
     if (!user) return null;
 
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is inactive. Please contact your administrator.');
+    }
+
     const valid = await this.verifyPassword(user.passwordHash, password);
     if (!valid) return null;
+
+    // If a selectedRole is provided, verify the account's actual role matches.
+    // AI_SERVICE cannot be a human login role.
+    if (selectedRole) {
+      const actualRole = user.role?.name;
+      if (actualRole === 'AI_SERVICE' || actualRole !== selectedRole) {
+        // Log this as a failed attempt (role mismatch) but return null safely
+        return null;
+      }
+    }
 
     // Strip the passwordHash before returning (never expose it)
     const { passwordHash: _hash, ...safeUser } = user as any;

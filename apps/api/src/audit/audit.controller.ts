@@ -9,6 +9,7 @@ import {
   HttpStatus,
   MethodNotAllowedException,
   Req,
+  Inject,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
@@ -19,7 +20,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/audit-logs')
 export class AuditController {
-  constructor(private readonly auditService: AuditService) {}
+  constructor(@Inject(AuditService) private readonly auditService: AuditService) {}
 
   // ─── GET /api/audit-logs ─────────────────────────────────────────────────
   @Roles('SUPER_ADMIN')

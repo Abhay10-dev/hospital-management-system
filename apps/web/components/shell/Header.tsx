@@ -1,145 +1,112 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRole } from '@/context/RoleContext';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { LogOut, Menu } from 'lucide-react';
 import { RoleName } from '@hospital/shared-types';
-import {
-  ShieldCheck,
-  UserCheck,
-  Activity,
-  Layers,
-  Sparkles,
-} from 'lucide-react';
 
-const ROLES: { name: RoleName; label: string; badgeVariant: 'superadmin' | 'info' | 'success' | 'warning' | 'secondary' | 'default' }[] = [
-  { name: 'SUPER_ADMIN', label: 'Super Admin', badgeVariant: 'superadmin' },
-  { name: 'ADMIN', label: 'Admin', badgeVariant: 'info' },
-  { name: 'RECEPTIONIST', label: 'Receptionist', badgeVariant: 'warning' },
-  { name: 'DOCTOR', label: 'Doctor', badgeVariant: 'success' },
-  { name: 'NURSE', label: 'Nurse', badgeVariant: 'secondary' },
-  { name: 'AI_SERVICE', label: 'AI Voice Service', badgeVariant: 'info' },
-];
+// Map route path to display title
+function getPageTitle(pathname: string): string {
+  if (pathname === '/dashboard') return 'Dashboard';
+  if (pathname.startsWith('/patients')) return 'Patients';
+  if (pathname.startsWith('/appointments')) return 'Appointments';
+  if (pathname.startsWith('/doctors')) return 'Doctors & Schedules';
+  if (pathname.startsWith('/audit-logs')) return 'Audit Trail Logs';
+  if (pathname.startsWith('/settings')) return 'Settings';
+  return 'Advfiction HMS';
+}
+
+// Map role to badge variant
+function getRoleBadgeVariant(role: RoleName): 'superadmin' | 'info' | 'warning' | 'success' | 'secondary' {
+  switch (role) {
+    case 'SUPER_ADMIN': return 'superadmin';
+    case 'ADMIN': return 'info';
+    case 'RECEPTIONIST': return 'warning';
+    case 'DOCTOR': return 'success';
+    case 'NURSE': return 'secondary';
+    default: return 'secondary';
+  }
+}
+
+// Format role for display
+function formatRole(role: RoleName): string {
+  return role.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export function Header() {
-  const { currentRole, currentUser, setRole, canAccessAuditLogs } = useRole();
   const pathname = usePathname();
+  const { currentUser, currentRole, logout } = useRole();
+  const pageTitle = getPageTitle(pathname);
+
+  // Get user initials for avatar
+  const initials = currentUser.fullName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n) => n[0].toUpperCase())
+    .join('');
+
+  const handleLogout = async () => {
+    await logout();
+  };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border bg-white shadow-sm">
-      <div className="flex h-16 items-center justify-between px-6">
-        {/* Brand / Logo */}
-        <div className="flex items-center gap-6">
-          <Link href="/dashboard" className="flex items-center gap-2.5 font-bold text-lg text-primary">
-            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-black border border-primary/20">
-              <Activity className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex flex-col">
-              <span className="leading-tight text-foreground font-bold">HealthPulse HMS</span>
-              <span className="text-[10px] text-muted-foreground font-normal tracking-wide">
-                AI Voice Enabled System
-              </span>
-            </div>
-          </Link>
+    <header className="sticky top-0 z-40 h-14 w-full border-b border-[#F3F4F6] bg-white shadow-sm">
+      <div className="flex h-full items-center justify-between px-4 lg:px-6">
 
-          {/* Quick Nav */}
-          <nav className="hidden md:flex items-center gap-1 text-sm font-medium">
-            <Link
-              href="/dashboard"
-              className={`px-3 py-1.5 rounded-md transition-colors ${
-                pathname === '/dashboard'
-                  ? 'bg-primary/10 text-primary font-semibold'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-slate-100'
-              }`}
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/patients"
-              className={`px-3 py-1.5 rounded-md transition-colors ${
-                pathname === '/patients'
-                  ? 'bg-primary/10 text-primary font-semibold'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-slate-100'
-              }`}
-            >
-              Patient Records
-            </Link>
-            <Link
-              href="/appointments"
-              className={`px-3 py-1.5 rounded-md transition-colors ${
-                pathname === '/appointments'
-                  ? 'bg-primary/10 text-primary font-semibold'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-slate-100'
-              }`}
-            >
-              Appointments
-            </Link>
-            {canAccessAuditLogs && (
-              <Link
-                href="/audit-logs"
-                className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 ${
-                  pathname === '/audit-logs'
-                    ? 'bg-purple-100 text-purple-800 font-semibold'
-                    : 'text-purple-700 hover:bg-purple-50'
-                }`}
-              >
-                <ShieldCheck className="h-4 w-4" />
-                Audit Logs
-              </Link>
-            )}
-          </nav>
+        {/* Left: Mobile menu toggle + Page title */}
+        <div className="flex items-center gap-3">
+          {/* Mobile hamburger (sidebar drawer trigger — placeholder) */}
+          <button
+            type="button"
+            className="lg:hidden -ml-1 rounded-xl p-2 text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B82F6]"
+            aria-label="Open navigation menu"
+          >
+            <Menu className="h-5 w-5" aria-hidden="true" />
+          </button>
+
+          {/* Page title: 20px bold gray-900 */}
+          <h1 className="text-xl font-bold text-[#111827] truncate">{pageTitle}</h1>
         </div>
 
-        {/* Right Section: Role Switcher Demo Utility + User Info */}
-        <div className="flex items-center gap-4">
-          {/* Demo Role Switcher Bar */}
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-              <Layers className="h-3.5 w-3.5 text-primary" />
-              <span className="hidden sm:inline">DEMO ROLE:</span>
-            </div>
-            <select
-              value={currentRole}
-              onChange={(e) => setRole(e.target.value as RoleName)}
-              className="bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+        {/* Right: User info + Logout — NO role switcher */}
+        <div className="flex items-center gap-3">
+          {/* User name (hidden on small screens) */}
+          <div className="hidden sm:flex flex-col items-end">
+            <span className="text-sm font-medium text-[#111827] leading-none">
+              {currentUser.fullName.split('(')[0].trim()}
+            </span>
+            <Badge
+              variant={getRoleBadgeVariant(currentRole)}
+              className="mt-1 text-[10px] py-0 px-1.5"
             >
-              {ROLES.map((r) => (
-                <option key={r.name} value={r.name}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
+              {formatRole(currentRole)}
+            </Badge>
           </div>
 
-          {/* User Profile Chip */}
-          <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
-            <div className="h-8 w-8 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center font-bold text-xs text-slate-700">
-              {currentUser.fullName.charAt(0)}
-            </div>
-            <div className="hidden lg:flex flex-col text-left">
-              <span className="text-xs font-medium text-slate-900 leading-none">
-                {currentUser.fullName}
-              </span>
-              <div className="mt-1">
-                <Badge
-                  variant={
-                    currentRole === 'SUPER_ADMIN'
-                      ? 'superadmin'
-                      : currentRole === 'DOCTOR'
-                      ? 'success'
-                      : currentRole === 'RECEPTIONIST'
-                      ? 'warning'
-                      : 'info'
-                  }
-                  className="text-[10px] py-0 px-1.5 font-medium"
-                >
-                  {currentRole}
-                </Badge>
-              </div>
-            </div>
+          {/* Avatar: 28×28px, rounded-lg, #2563EB background */}
+          <div
+            className="h-7 w-7 rounded-lg bg-[#2563EB] flex items-center justify-center text-white text-xs font-semibold shrink-0"
+            aria-hidden="true"
+            title={currentUser.fullName}
+          >
+            {initials || '?'}
           </div>
+
+          {/* Logout button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="gap-1.5 text-[#6B7280] hover:text-[#DC2626] hover:bg-[#FEF2F2] px-2"
+            aria-label="Sign out"
+          >
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline text-sm">Sign out</span>
+          </Button>
         </div>
       </div>
     </header>

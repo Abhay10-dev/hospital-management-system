@@ -38,10 +38,10 @@ class ApiClient {
   }
 
   // Auth Endpoints
-  async login(email: string, password: string, rememberMe = false) {
+  async login(email: string, password: string, rememberMe = false, role?: string) {
     return this.request<{ message: string; user: any }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password, rememberMe }),
+      body: JSON.stringify({ email, password, rememberMe, ...(role ? { role } : {}) }),
     });
   }
 
@@ -118,3 +118,4 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
+export default apiClient;

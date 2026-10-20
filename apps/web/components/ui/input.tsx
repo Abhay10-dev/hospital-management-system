@@ -4,13 +4,15 @@ import { cn } from '@/lib/utils';
 export interface InputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {}
 
+// PDF Module 3: rounded-xl (12px), border #E5E7EB (gray-200), white bg, 
+// gray-400 placeholder, 2px focus ring #3B82F6, 14px text
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, ...props }, ref) => {
     return (
       <input
         type={type}
         className={cn(
-          'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-10 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#374151] placeholder:text-[#9CA3AF] transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B82F6] focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50',
           className
         )}
         ref={ref}

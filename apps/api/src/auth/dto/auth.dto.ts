@@ -1,4 +1,8 @@
-import { IsEmail, IsString, MinLength, IsBoolean, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsBoolean, IsOptional, IsIn } from 'class-validator';
+
+// Human-facing login roles only — AI_SERVICE is excluded from human login
+const HUMAN_LOGIN_ROLES = ['SUPER_ADMIN', 'ADMIN', 'RECEPTIONIST', 'DOCTOR', 'NURSE'] as const;
+export type HumanLoginRole = typeof HUMAN_LOGIN_ROLES[number];
 
 export class LoginDto {
   @IsEmail()
@@ -7,6 +11,11 @@ export class LoginDto {
   @IsString()
   @MinLength(8)
   password: string;
+
+  @IsIn(HUMAN_LOGIN_ROLES, {
+    message: 'Invalid role selected. AI_SERVICE cannot be used as a human login role.',
+  })
+  role: HumanLoginRole;
 
   @IsBoolean()
   @IsOptional()

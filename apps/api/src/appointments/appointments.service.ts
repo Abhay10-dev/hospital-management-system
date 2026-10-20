@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { stripSecrets } from '../common/utils/secret-stripper';
@@ -15,8 +15,8 @@ export interface CreateBookingRequestDto {
 @Injectable()
 export class AppointmentsService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly auditService: AuditService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(AuditService) private readonly auditService: AuditService,
   ) {}
 
   async findAll() {
